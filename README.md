@@ -2,17 +2,19 @@
 Instructions for having AsusWRT write a system monitoring logfile to another system on the network.
 
 ## Set up SSH Keys
-I am using PowerShell in Windows 10 to write these instructions. Start by generating SSH keys using `ssh-keygen` in Open SSH. Instructions for enabling OpenSSH and using `ssh-keygen` can be found here: https://www.techrepublic.com/blog/10-things/how-to-generate-ssh-keys-in-openssh-for-windows-10/
+***Note: I am using PowerShell in Windows 10 to write these instructions.*** 
+  * Start by generating SSH keys using `ssh-keygen` in Open SSH 
+    * Instructions for enabling OpenSSH and using `ssh-keygen` can be found here: https://www.techrepublic.com/blog/10-things/how-to-generate-ssh-keys-in-openssh-for-windows-10/
 
 ## Configure SSH Settings in Your ASUS Router
-Configure your router with the SSH keys generated earlier as described here: https://www.htpcguides.com/enable-ssh-asus-routers-without-ssh-keys/
+  * Configure your router with the SSH keys generated earlier as described here: https://www.htpcguides.com/enable-ssh-asus-routers-without-ssh-keys/
 
 ## SSH into Your Main Router
-Use the `ssh` command while referencing your SSH key, your router's user name, and your router's SSH port with `ssh -i PATH\TO\SSHKEY -l USERNAME -p PORT ROUTERIP`. 
-  * Mine looked like `ssh -i .\ssh\asuswrt-pc-key -l username -p 22 192.168.1.1`
+  * Use the `ssh` command while referencing your SSH key, your router's user name, and your router's SSH port with `ssh -i PATH\TO\SSHKEY -l USERNAME -p PORT ROUTERIP` 
+    * Mine looked like `ssh -i .\ssh\asuswrt-pc-key -l username -p 22 192.168.1.1`
 
 ## Configure the script
-  * Copy the asuswrt_monitor.sh script from this repository into a text editor
+  * Copy the `asuswrt_monitor.sh` script from this repository into a text editor
   * Modify the two constants at the top of the file
     * `LOGHOST` is the hostname or IP of the system where you wish to store logs
     * `LOGPATH` is the path on that system where you wish to store the logs
@@ -21,7 +23,7 @@ Use the `ssh` command while referencing your SSH key, your router's user name, a
 ## Navigate to the persistent directory and add in scripts and directories
 ***Note: Shell limitations*** The ASUS routers have a really lightweight bash shell called busybox. It is missing many of the commands I expected (I am a linux novice), so it was a bit of a learning curve. I will provide very explicit instructions because it felt a lot like trial and error. I will likely need to follow my instructions at some point in the future, as well.
 ### Navigate to the persistent directory and add the script with vi
-***Note: Most of the router's file system resets every time it reboots*** Any files you add or change will disappear, unless those files are contained in the persistent `/jffs/` directory. 
+***Note: Most of the router's file system resets every time it reboots.*** Any files you add or change will disappear, unless those files are contained in the persistent `/jffs/` directory. 
   * Navigate to the `/jffs/` directory with `cd /jffs`
   * Open the vi text editor to create a new file with `vi asuswrt_monitor.sh`
   * Press the `insert` key on your keyboard to switch vi into insert mode
@@ -76,3 +78,30 @@ On your system which will be holding the logs, add the public key file you just 
   * Navigate to the jffs directory with `cd /jffs/`
   * Run the script with `./asuswrt_monitor`
   * Check your host machine, there should be a log file in the desired directory named ROUTERNAME.log that contains the system monitor data
+  
+## Ensure everything turns back on after every reboot
+***Note: fighting back after reboots*** In addition to everything not in the `/jffs/` directory being removed all of the files in the `/jffs/` directory have their permissions changed so that they are no longer executable
+  * There is one workaround to run scripts to repopulate non `/jffs/` directories and files and re-permission scripts
+    * Whenever a USB device is mounted, which automatically happens after each reboot, whatever script is included in the `script_usbmount` NVRAM variable is run
+    * Provided that a USB drive is connected to your router, this script can return the system to expected behavior for the logging script
+### Navigate to the persistent directory and in the reboot script  
+  * Copy the `exec_at_reboot.sh` script from this repository into a text editor
+  * Navigate to the `/jffs/` directory with `cd /jffs`
+  * Open the vi text editor to create a new file with `vi exec_at_reboot.sh`
+  * Press the `insert` key on your keyboard to switch vi into insert mode
+  * `Right click` your mouse to paste the contents of the system clipboard into vi
+  * Press the `escape` key on your keyboard to switch vi into command mode
+  * Type `:wq` to open the command, save the file, and quit
+  * Make the shell script executable with `chmod 700 exec_at_reboot.sh`
+  * Execute the shell script to set the NVRAM variable with `./exec_at_reboot.sh`
+  * Verify the cron tab is loaded with `cru -l`
+    * It should read `* * * * * /jffs/asuswrt_monitor.sh #SYSMNTR#`
+    
+    
+    
+    
+    
+## Clean up your logs
+  * Logs will be generated once a minute for each router in your system
+  * Consider automating your logging system to delete old logs
+    * Generic instructions can be found here: https://unix.stackexchange.com/a/310873
