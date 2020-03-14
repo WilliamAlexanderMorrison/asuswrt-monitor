@@ -24,7 +24,8 @@ e2=`wl -i eth2 phy_tempsense | awk '{print $1}'`
 tempRadio=`expr $e2 / 2 + 20 + $tempRadio`
 #handle both single and dual 5ghz cell radio temperatures
 e3=`wl -i eth3 phy_tempsense | awk '{print $1}'`
-if [ -n "$e3" ] && [ "$e3" -eq "$e3" ] 2>/dev/null; then
+if [ -n "$e3" ] && [ "$e3" -eq "$e3" ] 2>/dev/null
+then
   tempRadio=`expr $e3 / 2 + 20 + $tempRadio`
   tempRadio=`expr $tempRadio / 3`
 else
