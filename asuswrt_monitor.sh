@@ -17,20 +17,55 @@ logserverIP=`nvram get lan_ipaddr_rt`
 
 #get cpu temp
 tempCpu=`cat /proc/dmu/temperature | awk {'print substr($4,1,2)'}`
-#get radio temps and convert to C by dividing by 2 and adding 20
-e1=`wl -i eth1 phy_tempsense | awk '{print $1}'`
-tempRadio=`expr $e1 / 2 + 20`
-e2=`wl -i eth2 phy_tempsense | awk '{print $1}'`
-tempRadio=`expr $e2 / 2 + 20 + $tempRadio`
-#handle both single and dual 5ghz cell radio temperatures
-e3=`wl -i eth3 phy_tempsense | awk '{print $1}'`
-if [ -n "$e3" ] && [ "$e3" -eq "$e3" ] 2>/dev/null
+#initialize radio temp holders
+temp1=0
+temp2=0
+temp3=0
+tempRadio=0
+successTemps=0
+adapterStatus=""
+#check to make sure the radio adapter is responding
+if wl -i eth1 phy_tempsense
 then
-  tempRadio=`expr $e3 / 2 + 20 + $tempRadio`
-  tempRadio=`expr $tempRadio / 3`
+    #get radio temps in hex
+    rawRadioTemp=`wl -i eth1 phy_tempsense | awk '{print $1}'`
+    #convert hex temp to C
+    temp1=`expr $rawRadioTemp / 2 + 20`
+    #increment the number of successful temperatures gathered
+    successTemps=`expr $successTemps + 1`
 else
-  tempRadio=`expr $tempRadio / 2`
+    #note in status if the radio adapter isn't responding
+    adapterStatus=$adapterStatus'NO ETH1 '
 fi
+if wl -i eth2 phy_tempsense
+then
+    rawRadioTemp=`wl -i eth2 phy_tempsense | awk '{print $1}'`
+    temp2=`expr $rawRadioTemp / 2 + 20`
+    successTemps=`expr $successTemps + 1`
+else
+    adapterStatus=$adapterStatus'NO ETH2 '
+fi
+#handle dual 5ghz cell radios- 3 radio adapters to check
+if wl -i eth3 phy_tempsense
+then
+    rawRadioTemp=`wl -i eth3 phy_tempsense | awk '{print $1}'`
+    temp3=`expr $rawRadioTemp / 2 + 20`
+    successTemps=`expr $successTemps + 1`
+else
+    adapterStatus=$adapterStatus'NO ETH3 '
+fi
+#get the average of the successful temp checks
+if [ $successTemps -gt 0 ]
+then
+    tempRadio=`expr $temp1 + $temp2 + $temp3`
+    tempRadio=`expr $tempRadio / $successTemps`
+fi
+#if there aren't any status messages mark ok
+if [ -z $adapterStatus ]
+then
+    adapterStatus="OK"
+fi
+
 #get 1m CPU load
 load1m=`cat /proc/loadavg | cut -d' ' -f 0`
 #get the uptime in seconds
@@ -40,6 +75,7 @@ uptime=`cat /proc/uptime | cut -d' ' -f 0`
 logMsg='\{'
 logMsg=$logMsg'\"tempcpu\":'$tempCpu','
 logMsg=$logMsg'\"tempradio\":'$tempRadio','
+logMsg=$logMsg'\"adapterstatus\":\"'$adapterStatus'\",'
 logMsg=$logMsg'\"load1m\":'$load1m','
 logMsg=$logMsg'\"uptime\":'$uptime
 logMsg=$logMsg'\}'
